@@ -26,6 +26,7 @@ badminton_reservation_system/
 │   ├── services/
 │   └── ui/
 ├── scripts/
+│   ├── doctor.py
 │   ├── init_admin.py
 │   └── seed_demo_data.py
 ├── sql/
@@ -35,9 +36,12 @@ badminton_reservation_system/
 │   ├── 课程设计报告草稿.md
 │   ├── 测试用例与运行记录.md
 │   ├── 运行与打包说明.md
+│   ├── Harness工程说明.md
 │   └── templates/
 ├── tests/
+├── .github/workflows/tests.yml
 ├── .env.example
+├── Makefile
 ├── requirements.txt
 ├── build_exe.md
 └── main.py
@@ -92,6 +96,14 @@ python scripts/seed_demo_data.py
 python main.py
 ```
 
+也可以使用统一工程命令：
+
+```bash
+make doctor
+make check
+make run
+```
+
 ## 角色说明
 
 - 普通用户注册时默认 `role=user`。
@@ -107,6 +119,7 @@ python main.py
 - 测试用例与运行记录
 - 运行与打包说明
 - 数据库设计说明
+- Harness 工程说明
 - 截图清单
 - 老师提供的 Word 模板备份
 
@@ -122,6 +135,13 @@ pytest -q
 
 ```bash
 RUN_MYSQL_TESTS=1 pytest tests/test_mysql_connection_optional.py -q
+```
+
+工程化自检入口：
+
+```bash
+python scripts/doctor.py
+python scripts/doctor.py --mysql
 ```
 
 ## 关键实现说明
