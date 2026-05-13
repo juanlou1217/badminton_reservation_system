@@ -30,8 +30,7 @@ badminton_reservation_system/
 │   └── seed_demo_data.py
 ├── sql/
 │   ├── schema.sql
-│   ├── init.sql
-│   └── backup.sql
+│   └── init.sql
 ├── doc/
 │   ├── 课程设计报告草稿.md
 │   ├── 测试用例与运行记录.md
