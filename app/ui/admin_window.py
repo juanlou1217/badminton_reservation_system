@@ -12,6 +12,8 @@ from app.services.admin_service import AdminService
 from app.services.court_service import CourtService
 from app.services.export_service import ExportService
 from app.services.reservation_service import ReservationError, ReservationService
+from app.services.settings_service import SettingsService
+from app.services.stats_service import StatsService
 
 
 class AdminWindow(tk.Toplevel):
@@ -39,6 +41,7 @@ class AdminWindow(tk.Toplevel):
         notebook.add(self._build_courts_tab(notebook), text="场地管理")
         notebook.add(self._build_slots_tab(notebook), text="时间段管理")
         notebook.add(self._build_reservations_tab(notebook), text="预约管理")
+        notebook.add(self._build_settings_tab(notebook), text="系统设置")
         notebook.add(self._build_export_tab(notebook), text="统计导出")
 
     def _build_users_tab(self, parent) -> ttk.Frame:
@@ -113,14 +116,30 @@ class AdminWindow(tk.Toplevel):
 
     def _build_export_tab(self, parent) -> ttk.Frame:
         frame = ttk.Frame(parent, padding=24)
+        self.stats_text = tk.StringVar(value="点击刷新统计查看当前预约数据")
+        ttk.Label(frame, textvariable=self.stats_text, justify=tk.LEFT).pack(anchor=tk.W, fill=tk.X)
+        ttk.Button(frame, text="刷新统计", command=self.refresh_stats).pack(anchor=tk.W, pady=(12, 0))
         ttk.Label(frame, text="导出全部预约记录为 Excel 文件").pack(anchor=tk.W)
         ttk.Button(frame, text="选择路径并导出", command=self.export_reservations).pack(anchor=tk.W, pady=(16, 0))
+        return frame
+
+    def _build_settings_tab(self, parent) -> ttk.Frame:
+        frame = ttk.Frame(parent, padding=24)
+        ttk.Label(frame, text="单个用户每天最多预约次数").grid(row=0, column=0, sticky=tk.W, pady=8)
+        self.max_daily_var = tk.StringVar(value="2")
+        ttk.Entry(frame, textvariable=self.max_daily_var, width=12).grid(row=0, column=1, sticky=tk.W, pady=8, padx=(12, 0))
+        ttk.Label(frame, text="系统公告").grid(row=1, column=0, sticky=tk.NW, pady=8)
+        self.announcement_text = tk.Text(frame, width=60, height=6)
+        self.announcement_text.grid(row=1, column=1, sticky=tk.W, pady=8, padx=(12, 0))
+        ttk.Button(frame, text="保存设置", command=self.save_settings).grid(row=2, column=1, sticky=tk.E, pady=(12, 0))
         return frame
 
     def refresh_all(self) -> None:
         self.refresh_users()
         self.refresh_courts()
         self.refresh_reservations()
+        self.refresh_settings()
+        self.refresh_stats()
 
     def refresh_users(self) -> None:
         self.user_tree.delete(*self.user_tree.get_children())
@@ -207,6 +226,38 @@ class AdminWindow(tk.Toplevel):
             return
         ExportService(self.session).export_reservations_to_xlsx(path)
         messagebox.showinfo("导出成功", f"已导出到：{path}")
+
+    def refresh_settings(self) -> None:
+        service = SettingsService(self.session)
+        self.max_daily_var.set(str(service.get_int("max_daily_reservations", 2)))
+        self.announcement_text.delete("1.0", tk.END)
+        self.announcement_text.insert("1.0", service.get_value("announcement", ""))
+
+    def save_settings(self) -> None:
+        try:
+            max_daily = int(self.max_daily_var.get())
+        except ValueError:
+            messagebox.showerror("保存失败", "每日预约次数必须是数字")
+            return
+        if max_daily < 1:
+            messagebox.showerror("保存失败", "每日预约次数必须大于 0")
+            return
+        service = SettingsService(self.session)
+        service.set_value("max_daily_reservations", str(max_daily), "单个用户每天最多预约次数")
+        service.set_value("announcement", self.announcement_text.get("1.0", tk.END).strip(), "系统公告")
+        messagebox.showinfo("保存成功", "系统设置已保存。")
+
+    def refresh_stats(self) -> None:
+        summary = StatsService(self.session).reservation_summary()
+        court_lines = ", ".join(f"{item['court']} {item['count']} 次" for item in summary["by_court"]) or "暂无"
+        date_lines = ", ".join(f"{item['date']} {item['count']} 次" for item in summary["by_date"]) or "暂无"
+        self.stats_text.set(
+            f"预约总数：{summary['total']}\\n"
+            f"有效预约：{summary['booked']}\\n"
+            f"已取消：{summary['cancelled']}\\n"
+            f"场地使用统计：{court_lines}\\n"
+            f"每日预约统计：{date_lines}"
+        )
 
     def _selected_iid(self, tree: ttk.Treeview) -> str | None:
         selection = tree.selection()

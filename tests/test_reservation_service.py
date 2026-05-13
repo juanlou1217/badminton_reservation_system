@@ -27,6 +27,29 @@ def test_create_reservation_rejects_already_booked_slot(db_session, seeded_db):
         service.create_reservation(user_id=seeded_db["user"].id, slot_id=seeded_db["slot"].id)
 
 
+def test_create_reservation_respects_daily_limit(db_session, seeded_db):
+    from datetime import date, time
+
+    from app.models import TimeSlot
+    from app.services.settings_service import SettingsService
+
+    SettingsService(db_session).set_value("max_daily_reservations", "1", "每日最大预约次数")
+    second_slot = TimeSlot(
+        court_id=seeded_db["court"].id,
+        slot_date=date(2026, 5, 20),
+        start_time=time(10, 0),
+        end_time=time(12, 0),
+        status="available",
+    )
+    db_session.add(second_slot)
+    db_session.commit()
+    service = ReservationService(db_session)
+    service.create_reservation(user_id=seeded_db["user"].id, slot_id=seeded_db["slot"].id)
+
+    with pytest.raises(ReservationError, match="超过每日预约次数限制"):
+        service.create_reservation(user_id=seeded_db["user"].id, slot_id=second_slot.id)
+
+
 def test_cancel_reservation_only_cancels_owner_booking(db_session, seeded_db):
     service = ReservationService(db_session)
     reservation = service.create_reservation(

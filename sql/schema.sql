@@ -56,3 +56,7 @@ CREATE TABLE IF NOT EXISTS settings (
     setting_value VARCHAR(255) NOT NULL,
     remark TEXT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO settings (setting_key, setting_value, remark)
+VALUES ('max_daily_reservations', '2', '单个用户每天最多预约次数')
+ON DUPLICATE KEY UPDATE setting_value = setting_value;

@@ -6,6 +6,7 @@ from uuid import uuid4
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import Reservation, TimeSlot
+from app.services.settings_service import SettingsService
 
 
 class ReservationError(Exception):
@@ -29,6 +30,19 @@ class ReservationService:
         )
         if exists is not None:
             raise ReservationError("时间段已被预约")
+        max_daily = SettingsService(self.session).get_int("max_daily_reservations", 2)
+        daily_count = (
+            self.session.query(Reservation)
+            .join(TimeSlot, Reservation.slot_id == TimeSlot.id)
+            .filter(
+                Reservation.user_id == user_id,
+                Reservation.status == "booked",
+                TimeSlot.slot_date == slot.slot_date,
+            )
+            .count()
+        )
+        if daily_count >= max_daily:
+            raise ReservationError("超过每日预约次数限制")
         reservation = Reservation(
             reservation_no=self._new_reservation_no(),
             user_id=user_id,

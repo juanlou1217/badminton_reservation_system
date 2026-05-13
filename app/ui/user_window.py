@@ -10,6 +10,7 @@ from tkcalendar import DateEntry
 from app.models import Court, TimeSlot, User
 from app.services.court_service import CourtService
 from app.services.reservation_service import ReservationError, ReservationService
+from app.services.settings_service import SettingsService
 from app.services.slot_service import SlotService
 
 
@@ -31,6 +32,8 @@ class UserWindow(tk.Toplevel):
         top = ttk.Frame(self, padding=(12, 8))
         top.pack(fill=tk.X)
         ttk.Label(top, text=f"当前用户：{self.current_user.username}").pack(side=tk.LEFT)
+        self.announcement_var = tk.StringVar(value="")
+        ttk.Label(top, textvariable=self.announcement_var).pack(side=tk.LEFT, padx=(24, 0))
         ttk.Button(top, text="退出登录", command=self.logout).pack(side=tk.RIGHT)
 
         notebook = ttk.Notebook(self)
@@ -84,8 +87,13 @@ class UserWindow(tk.Toplevel):
         return frame
 
     def refresh_all(self) -> None:
+        self.refresh_announcement()
         self.refresh_courts()
         self.refresh_reservations()
+
+    def refresh_announcement(self) -> None:
+        announcement = SettingsService(self.session).get_value("announcement", "")
+        self.announcement_var.set(f"公告：{announcement}" if announcement else "")
 
     def refresh_courts(self) -> None:
         self.courts = CourtService(self.session).list_open_courts()
