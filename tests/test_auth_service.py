@@ -45,3 +45,13 @@ def test_authenticate_rejects_disabled_user(db_session):
 
     with pytest.raises(AuthenticationError, match="账号已被禁用"):
         service.authenticate("alice", "right-pass")
+
+
+def test_register_user_validates_phone_and_password(db_session):
+    service = AuthService(db_session)
+
+    with pytest.raises(AuthenticationError, match="手机号格式不正确"):
+        service.register_user("bob", "123", "secret123")
+
+    with pytest.raises(AuthenticationError, match="密码长度不能少于 6 位"):
+        service.register_user("bob", "13700000000", "123")

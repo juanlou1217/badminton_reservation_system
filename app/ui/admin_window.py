@@ -143,7 +143,7 @@ class AdminWindow(tk.Toplevel):
 
     def refresh_users(self) -> None:
         self.user_tree.delete(*self.user_tree.get_children())
-        for user in AdminService(self.session).list_users():
+        for user in AdminService(self.session, self.current_user).list_users():
             self.user_tree.insert("", tk.END, iid=str(user.id), values=(user.username, user.phone, user.role, user.status))
 
     def refresh_courts(self) -> None:
@@ -167,7 +167,7 @@ class AdminWindow(tk.Toplevel):
 
     def create_court(self) -> None:
         try:
-            AdminService(self.session).create_court(
+            AdminService(self.session, self.current_user).create_court(
                 self.court_no_var.get(),
                 self.court_name_var.get(),
                 self.court_location_var.get(),
@@ -181,14 +181,14 @@ class AdminWindow(tk.Toplevel):
         item = self._selected_iid(self.user_tree)
         if item is None:
             return
-        AdminService(self.session).set_user_status(int(item), status)
+        AdminService(self.session, self.current_user).set_user_status(int(item), status)
         self.refresh_users()
 
     def set_selected_court_status(self, status: str) -> None:
         item = self._selected_iid(self.admin_court_tree)
         if item is None:
             return
-        AdminService(self.session).update_court_status(int(item), status)
+        AdminService(self.session, self.current_user).update_court_status(int(item), status)
         self.refresh_courts()
 
     def generate_slots(self) -> None:
@@ -197,7 +197,7 @@ class AdminWindow(tk.Toplevel):
             messagebox.showwarning("提示", "请先选择场地")
             return
         ranges = [(time(8, 0), time(10, 0)), (time(10, 0), time(12, 0)), (time(14, 0), time(16, 0)), (time(16, 0), time(18, 0))]
-        slots = AdminService(self.session).generate_slots(
+        slots = AdminService(self.session, self.current_user).generate_slots(
             self.courts[selected].id,
             self.slot_start_date.get_date(),
             self.slot_end_date.get_date(),
@@ -210,7 +210,7 @@ class AdminWindow(tk.Toplevel):
         if item is None:
             return
         try:
-            ReservationService(self.session).cancel_reservation(int(item), self.current_user.id, is_admin=True)
+            ReservationService(self.session).cancel_reservation(int(item), self.current_user)
         except ReservationError as exc:
             messagebox.showerror("取消失败", str(exc))
             return

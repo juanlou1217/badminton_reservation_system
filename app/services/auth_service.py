@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from sqlalchemy.orm import Session
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -33,6 +35,10 @@ class AuthService:
         phone = phone.strip()
         if not username or not password:
             raise AuthenticationError("用户名和密码不能为空")
+        if phone and re.fullmatch(r"1\d{10}", phone) is None:
+            raise AuthenticationError("手机号格式不正确")
+        if len(password) < 6:
+            raise AuthenticationError("密码长度不能少于 6 位")
         exists = self.session.query(User).filter_by(username=username).one_or_none()
         if exists is not None:
             raise AuthenticationError("用户名已存在")

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.models import Reservation
+from app.models import Reservation, User
 from app.services.reservation_service import ReservationError, ReservationService
 
 
@@ -59,8 +59,7 @@ def test_cancel_reservation_only_cancels_owner_booking(db_session, seeded_db):
 
     cancelled = service.cancel_reservation(
         reservation_id=reservation.id,
-        current_user_id=seeded_db["user"].id,
-        is_admin=False,
+        current_user=seeded_db["user"],
     )
 
     assert cancelled.status == "cancelled"
@@ -69,6 +68,15 @@ def test_cancel_reservation_only_cancels_owner_booking(db_session, seeded_db):
 
 def test_cancel_reservation_rejects_other_user(db_session, seeded_db):
     service = ReservationService(db_session)
+    other_user = User(
+        username="charlie",
+        phone="13600000000",
+        password_hash="placeholder",
+        role="user",
+        status="normal",
+    )
+    db_session.add(other_user)
+    db_session.commit()
     reservation = service.create_reservation(
         user_id=seeded_db["user"].id,
         slot_id=seeded_db["slot"].id,
@@ -77,6 +85,20 @@ def test_cancel_reservation_rejects_other_user(db_session, seeded_db):
     with pytest.raises(ReservationError, match="只能取消自己的预约"):
         service.cancel_reservation(
             reservation_id=reservation.id,
-            current_user_id=999,
-            is_admin=False,
+            current_user=other_user,
         )
+
+
+def test_admin_can_cancel_any_booking(db_session, seeded_db):
+    service = ReservationService(db_session)
+    reservation = service.create_reservation(
+        user_id=seeded_db["user"].id,
+        slot_id=seeded_db["slot"].id,
+    )
+
+    cancelled = service.cancel_reservation(
+        reservation_id=reservation.id,
+        current_user=seeded_db["admin"],
+    )
+
+    assert cancelled.status == "cancelled"

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from datetime import date, time
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.db import SessionLocal, init_db
 from app.models import Court, TimeSlot

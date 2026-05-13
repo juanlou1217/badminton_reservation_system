@@ -12,15 +12,14 @@ from app.services.reservation_service import ReservationService
 
 
 def test_admin_service_rejects_non_admin(db_session, seeded_db):
-    service = AdminService(db_session)
+    service = AdminService(db_session, seeded_db["user"])
 
     with pytest.raises(AdminPermissionError):
-        service.require_admin(seeded_db["user"])
+        service.list_users()
 
 
 def test_admin_can_create_court_and_generate_slots(db_session, seeded_db):
-    service = AdminService(db_session)
-    service.require_admin(seeded_db["admin"])
+    service = AdminService(db_session, seeded_db["admin"])
 
     court = service.create_court("C02", "二号场", "体育馆二层", "open", "")
     slots = service.generate_slots(
@@ -32,6 +31,16 @@ def test_admin_can_create_court_and_generate_slots(db_session, seeded_db):
 
     assert court.court_no == "C02"
     assert len(slots) == 2
+
+
+def test_admin_service_validates_court_input(db_session, seeded_db):
+    service = AdminService(db_session, seeded_db["admin"])
+
+    with pytest.raises(ValueError, match="场地编号不能为空"):
+        service.create_court("", "二号场", "体育馆二层", "open", "")
+
+    with pytest.raises(ValueError, match="场地状态不合法"):
+        service.create_court("C02", "二号场", "体育馆二层", "broken", "")
 
 
 def test_export_reservations_to_xlsx_creates_valid_workbook(tmp_path, db_session, seeded_db):

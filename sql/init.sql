@@ -1,3 +1,10 @@
+-- 体育馆羽毛球预约系统初始化脚本
+-- 一次性完成：建表、默认系统设置、演示场地、当天演示时间段。
+-- 管理员账号建议使用 `python scripts/init_admin.py` 创建，避免在公开 SQL 中固定密码。
+
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 1;
+
 CREATE TABLE IF NOT EXISTS users (
     id INT PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(50) NOT NULL UNIQUE,
@@ -68,5 +75,30 @@ CREATE TABLE IF NOT EXISTS settings (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO settings (setting_key, setting_value, remark)
-VALUES ('max_daily_reservations', '2', '单个用户每天最多预约次数')
-ON DUPLICATE KEY UPDATE setting_value = setting_value;
+VALUES
+    ('max_daily_reservations', '2', '单个用户每天最多预约次数'),
+    ('announcement', '欢迎使用体育馆羽毛球预约系统。', '系统公告')
+ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), remark = VALUES(remark);
+
+INSERT INTO courts (court_no, name, location, status, remark)
+VALUES
+    ('C01', '一号场', '体育馆一层东侧', 'open', '演示数据'),
+    ('C02', '二号场', '体育馆一层西侧', 'open', '演示数据'),
+    ('C03', '三号场', '体育馆二层', 'open', '演示数据')
+ON DUPLICATE KEY UPDATE
+    name = VALUES(name),
+    location = VALUES(location),
+    status = VALUES(status),
+    remark = VALUES(remark);
+
+INSERT INTO time_slots (court_id, slot_date, start_time, end_time, status)
+SELECT c.id, CURDATE(), t.start_time, t.end_time, 'available'
+FROM courts c
+JOIN (
+    SELECT TIME('08:00:00') AS start_time, TIME('10:00:00') AS end_time
+    UNION ALL SELECT TIME('10:00:00'), TIME('12:00:00')
+    UNION ALL SELECT TIME('14:00:00'), TIME('16:00:00')
+    UNION ALL SELECT TIME('16:00:00'), TIME('18:00:00')
+) t
+WHERE c.court_no IN ('C01', 'C02', 'C03')
+ON DUPLICATE KEY UPDATE status = time_slots.status;

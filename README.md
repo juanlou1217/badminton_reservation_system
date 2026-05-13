@@ -30,6 +30,7 @@ badminton_reservation_system/
 │   └── seed_demo_data.py
 ├── sql/
 │   ├── schema.sql
+│   ├── init.sql
 │   └── backup.sql
 ├── doc/
 │   ├── 课程设计报告草稿.md
@@ -64,7 +65,14 @@ cp .env.example .env
 3. 初始化数据库表。
 
 ```bash
+python scripts/check_db_connection.py
 python -c "from app.db import init_db; init_db()"
+```
+
+也可以用一个 SQL 文件完成表结构和演示数据初始化：
+
+```bash
+mysql -h juanlou.top -P 3306 -u juanlou -p juanlou < sql/init.sql
 ```
 
 4. 创建管理员账号。
@@ -109,4 +117,17 @@ python main.py
 pytest -q
 ```
 
-测试使用 SQLAlchemy 内存数据库验证服务层行为；正式运行只连接 `.env` 配置的远程 MySQL。
+测试使用 SQLAlchemy 内存数据库验证服务层行为；正式运行只连接 `.env` 配置的远程 MySQL。远程数据库连通性可通过 `python scripts/check_db_connection.py` 检查。
+
+可选远程 MySQL 集成测试：
+
+```bash
+RUN_MYSQL_TESTS=1 pytest tests/test_mysql_connection_optional.py -q
+```
+
+## 关键实现说明
+
+- 预约创建使用数据库条件更新抢占时间段：只有 `time_slots.status='available'` 时才会更新为 `booked`，避免两个客户端同时预约同一时间段。
+- 管理员服务在方法内部校验当前用户角色，不能只依赖 UI 入口。
+- 取消预约接收当前用户对象，服务层根据 `role` 判断是否允许管理员取消他人预约。
+- 服务层在数据库提交失败时执行 rollback，避免 session 留在不可继续使用状态。

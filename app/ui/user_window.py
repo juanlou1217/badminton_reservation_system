@@ -144,7 +144,7 @@ class UserWindow(tk.Toplevel):
         if item is None:
             return
         try:
-            ReservationService(self.session).cancel_reservation(int(item), self.current_user.id, is_admin=False)
+            ReservationService(self.session).cancel_reservation(int(item), self.current_user)
         except ReservationError as exc:
             messagebox.showerror("取消失败", str(exc))
             return

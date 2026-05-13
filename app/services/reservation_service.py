@@ -3,9 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import uuid4
 
+from sqlalchemy import update
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import Reservation, TimeSlot
+from app.models import Reservation, TimeSlot, User
 from app.services.settings_service import SettingsService
 
 
@@ -43,6 +45,14 @@ class ReservationService:
         )
         if daily_count >= max_daily:
             raise ReservationError("超过每日预约次数限制")
+        claimed = self.session.execute(
+            update(TimeSlot)
+            .where(TimeSlot.id == slot_id, TimeSlot.status == "available")
+            .values(status="booked")
+        )
+        if claimed.rowcount != 1:
+            self.session.rollback()
+            raise ReservationError("时间段已被预约")
         reservation = Reservation(
             reservation_no=self._new_reservation_no(),
             user_id=user_id,
@@ -50,31 +60,29 @@ class ReservationService:
             slot_id=slot_id,
             status="booked",
         )
-        slot.status = "booked"
         self.session.add(reservation)
-        self.session.commit()
+        self._commit()
         self.session.refresh(reservation)
         return reservation
 
     def cancel_reservation(
         self,
         reservation_id: int,
-        current_user_id: int,
-        is_admin: bool = False,
+        current_user: User,
     ) -> Reservation:
         reservation = self.session.get(Reservation, reservation_id)
         if reservation is None:
             raise ReservationError("预约不存在")
         if reservation.status != "booked":
             raise ReservationError("预约已取消或已完成")
-        if not is_admin and reservation.user_id != current_user_id:
+        if current_user.role != "admin" and reservation.user_id != current_user.id:
             raise ReservationError("只能取消自己的预约")
         reservation.status = "cancelled"
         reservation.cancelled_at = datetime.now()
         slot = self.session.get(TimeSlot, reservation.slot_id)
         if slot is not None:
             slot.status = "available"
-        self.session.commit()
+        self._commit()
         self.session.refresh(reservation)
         return reservation
 
@@ -101,3 +109,10 @@ class ReservationService:
 
     def _new_reservation_no(self) -> str:
         return "R" + datetime.now().strftime("%Y%m%d%H%M%S") + uuid4().hex[:6].upper()
+
+    def _commit(self) -> None:
+        try:
+            self.session.commit()
+        except SQLAlchemyError as exc:
+            self.session.rollback()
+            raise ReservationError("数据库操作失败，请稍后重试") from exc
