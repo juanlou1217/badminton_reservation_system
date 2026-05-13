@@ -23,6 +23,7 @@ from app.services.export_service import ExportService
 from app.services.reservation_service import ReservationError, ReservationService
 from app.services.settings_service import SettingsService
 from app.services.stats_service import StatsService
+from app.ui.treeview_helpers import configure_tree_columns
 
 
 def format_stats_summary(summary: dict) -> str:
@@ -69,8 +70,10 @@ class AdminWindow(tk.Toplevel):
     def _build_users_tab(self, parent) -> ttk.Frame:
         frame = ttk.Frame(parent, padding=8)
         self.user_tree = ttk.Treeview(frame, columns=("username", "phone", "role", "status"), show="headings")
-        for key, text in (("username", "用户名"), ("phone", "手机号"), ("role", "角色"), ("status", "状态")):
-            self.user_tree.heading(key, text=text)
+        configure_tree_columns(
+            self.user_tree,
+            (("username", "用户名"), ("phone", "手机号"), ("role", "角色"), ("status", "状态")),
+        )
         self.user_tree.pack(fill=tk.BOTH, expand=True)
         actions = ttk.Frame(frame)
         actions.pack(fill=tk.X, pady=(8, 0))
@@ -86,16 +89,28 @@ class AdminWindow(tk.Toplevel):
         self.court_no_var = tk.StringVar()
         self.court_name_var = tk.StringVar()
         self.court_location_var = tk.StringVar()
+        self.court_remark_var = tk.StringVar()
         for idx, (label, variable) in enumerate(
-            (("编号", self.court_no_var), ("名称", self.court_name_var), ("位置", self.court_location_var))
+            (
+                ("编号", self.court_no_var),
+                ("名称", self.court_name_var),
+                ("位置", self.court_location_var),
+                ("备注", self.court_remark_var),
+            )
         ):
             ttk.Label(form, text=label).grid(row=0, column=idx * 2, padx=(0, 6))
             ttk.Entry(form, textvariable=variable, width=18).grid(row=0, column=idx * 2 + 1, padx=(0, 12))
-        ttk.Button(form, text="新增场地", command=self.create_court).grid(row=0, column=6)
+        ttk.Button(form, text="新增场地", command=self.create_court).grid(row=0, column=8)
 
-        self.admin_court_tree = ttk.Treeview(frame, columns=("no", "name", "location", "status"), show="headings")
-        for key, text in (("no", "编号"), ("name", "名称"), ("location", "位置"), ("status", "状态")):
-            self.admin_court_tree.heading(key, text=text)
+        self.admin_court_tree = ttk.Treeview(
+            frame,
+            columns=("no", "name", "location", "status", "remark"),
+            show="headings",
+        )
+        configure_tree_columns(
+            self.admin_court_tree,
+            (("no", "编号"), ("name", "名称"), ("location", "位置"), ("status", "状态"), ("remark", "备注")),
+        )
         self.admin_court_tree.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
         actions = ttk.Frame(frame)
         actions.pack(fill=tk.X, pady=(8, 0))
@@ -104,6 +119,9 @@ class AdminWindow(tk.Toplevel):
             side=tk.RIGHT,
             padx=(0, 8),
         )
+        ttk.Button(actions, text="删除", command=self.delete_selected_court).pack(side=tk.RIGHT, padx=(0, 8))
+        ttk.Button(actions, text="保存修改", command=self.update_selected_court).pack(side=tk.RIGHT, padx=(0, 8))
+        ttk.Button(actions, text="填入选中", command=self.load_selected_court_to_form).pack(side=tk.RIGHT, padx=(0, 8))
         return frame
 
     def _build_slots_tab(self, parent) -> ttk.Frame:
@@ -130,8 +148,10 @@ class AdminWindow(tk.Toplevel):
             columns=("court", "date", "time", "status"),
             show="headings",
         )
-        for key, text in (("court", "场地"), ("date", "日期"), ("time", "时间"), ("status", "状态")):
-            self.admin_slot_tree.heading(key, text=text)
+        configure_tree_columns(
+            self.admin_slot_tree,
+            (("court", "场地"), ("date", "日期"), ("time", "时间"), ("status", "状态")),
+        )
         self.admin_slot_tree.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
         actions = ttk.Frame(frame)
         actions.pack(fill=tk.X, pady=(8, 0))
@@ -171,15 +191,17 @@ class AdminWindow(tk.Toplevel):
             columns=("no", "user", "court", "date", "time", "status"),
             show="headings",
         )
-        for key, text in (
-            ("no", "预约编号"),
-            ("user", "用户"),
-            ("court", "场地"),
-            ("date", "日期"),
-            ("time", "时间"),
-            ("status", "状态"),
-        ):
-            self.admin_reservation_tree.heading(key, text=text)
+        configure_tree_columns(
+            self.admin_reservation_tree,
+            (
+                ("no", "预约编号"),
+                ("user", "用户"),
+                ("court", "场地"),
+                ("date", "日期"),
+                ("time", "时间"),
+                ("status", "状态"),
+            ),
+        )
         self.admin_reservation_tree.pack(fill=tk.BOTH, expand=True)
         actions = ttk.Frame(frame)
         actions.pack(fill=tk.X, pady=(8, 0))
@@ -235,7 +257,7 @@ class AdminWindow(tk.Toplevel):
                 "",
                 tk.END,
                 iid=str(court.id),
-                values=(court.court_no, court.name, court.location, court_status_label(court.status)),
+                values=(court.court_no, court.name, court.location, court_status_label(court.status), court.remark),
             )
 
     def refresh_reservations(self) -> None:
@@ -287,9 +309,56 @@ class AdminWindow(tk.Toplevel):
                 self.court_no_var.get(),
                 self.court_name_var.get(),
                 self.court_location_var.get(),
+                remark=self.court_remark_var.get(),
             )
         except ValueError as exc:
             messagebox.showerror("新增失败", str(exc))
+            return
+        self.refresh_courts()
+
+    def load_selected_court_to_form(self) -> None:
+        item = self._selected_iid(self.admin_court_tree)
+        if item is None:
+            return
+        court = self._court_by_id(int(item))
+        if court is None:
+            messagebox.showerror("加载失败", "场地不存在")
+            return
+        self.court_no_var.set(court.court_no)
+        self.court_name_var.set(court.name)
+        self.court_location_var.set(court.location)
+        self.court_remark_var.set(court.remark)
+
+    def update_selected_court(self) -> None:
+        item = self._selected_iid(self.admin_court_tree)
+        if item is None:
+            return
+        court = self._court_by_id(int(item))
+        status = court.status if court is not None else "open"
+        try:
+            AdminService(self.session, self.current_user).update_court(
+                int(item),
+                court_no=self.court_no_var.get(),
+                name=self.court_name_var.get(),
+                location=self.court_location_var.get(),
+                status=status,
+                remark=self.court_remark_var.get(),
+            )
+        except ValueError as exc:
+            messagebox.showerror("修改失败", str(exc))
+            return
+        self.refresh_courts()
+
+    def delete_selected_court(self) -> None:
+        item = self._selected_iid(self.admin_court_tree)
+        if item is None:
+            return
+        if not messagebox.askyesno("确认删除", "确定删除选中的场地吗？"):
+            return
+        try:
+            AdminService(self.session, self.current_user).delete_court(int(item))
+        except ValueError as exc:
+            messagebox.showerror("删除失败", str(exc))
             return
         self.refresh_courts()
 
@@ -402,6 +471,9 @@ class AdminWindow(tk.Toplevel):
             messagebox.showwarning("提示", "请先选择一条记录")
             return None
         return selection[0]
+
+    def _court_by_id(self, court_id: int) -> Court | None:
+        return next((court for court in self.courts if court.id == court_id), None)
 
     def logout(self) -> None:
         self.destroy()

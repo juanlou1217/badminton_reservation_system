@@ -103,14 +103,22 @@ class ReservationService:
         self.session.refresh(reservation)
         return reservation
 
-    def list_user_reservations(self, user_id: int) -> list[Reservation]:
-        return (
+    def list_user_reservations(
+        self,
+        user_id: int,
+        status: str = "",
+        slot_date=None,
+    ) -> list[Reservation]:
+        query = (
             self.session.query(Reservation)
             .options(joinedload(Reservation.court), joinedload(Reservation.slot))
             .filter_by(user_id=user_id)
-            .order_by(Reservation.created_at.desc())
-            .all()
         )
+        if status:
+            query = query.filter(Reservation.status == status)
+        if slot_date is not None:
+            query = query.join(TimeSlot, Reservation.slot_id == TimeSlot.id).filter(TimeSlot.slot_date == slot_date)
+        return query.order_by(Reservation.created_at.desc()).all()
 
     def list_all_reservations(
         self,

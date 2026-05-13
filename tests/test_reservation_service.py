@@ -176,6 +176,40 @@ def test_cancel_reservation_rejects_verified_booking(db_session, seeded_db):
         )
 
 
+def test_list_user_reservations_can_filter_by_status_and_date(db_session, seeded_db):
+    from datetime import date, time
+
+    from app.models import TimeSlot
+
+    service = ReservationService(db_session)
+    first = service.create_reservation(
+        user_id=seeded_db["user"].id,
+        slot_id=seeded_db["slot"].id,
+    )
+    service.cancel_reservation(first.id, seeded_db["user"])
+    second_slot = TimeSlot(
+        court_id=seeded_db["court"].id,
+        slot_date=date(2026, 5, 21),
+        start_time=time(8, 0),
+        end_time=time(10, 0),
+        status="available",
+    )
+    db_session.add(second_slot)
+    db_session.commit()
+    second = service.create_reservation(
+        user_id=seeded_db["user"].id,
+        slot_id=second_slot.id,
+    )
+
+    filtered = service.list_user_reservations(
+        seeded_db["user"].id,
+        status="booked",
+        slot_date=date(2026, 5, 21),
+    )
+
+    assert [item.id for item in filtered] == [second.id]
+
+
 def test_list_all_reservations_requires_admin(db_session, seeded_db):
     service = ReservationService(db_session)
 

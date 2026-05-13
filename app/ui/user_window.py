@@ -7,12 +7,19 @@ from tkinter import messagebox, ttk
 from sqlalchemy.orm import Session
 from tkcalendar import DateEntry
 
-from app.display_labels import court_status_label, reservation_status_label, slot_status_label
+from app.display_labels import (
+    RESERVATION_STATUS_FILTER_LABELS,
+    court_status_label,
+    reservation_status_label,
+    reservation_status_value,
+    slot_status_label,
+)
 from app.models import Court, TimeSlot, User
 from app.services.court_service import CourtService
 from app.services.reservation_service import ReservationError, ReservationService
 from app.services.settings_service import SettingsService
 from app.services.slot_service import SlotService
+from app.ui.treeview_helpers import configure_tree_columns
 
 
 class UserWindow(tk.Toplevel):
@@ -45,11 +52,19 @@ class UserWindow(tk.Toplevel):
 
     def _build_court_tab(self, parent) -> ttk.Frame:
         frame = ttk.Frame(parent, padding=8)
+        filters = ttk.Frame(frame)
+        filters.pack(fill=tk.X, pady=(0, 8))
+        ttk.Label(filters, text="场地").pack(side=tk.LEFT)
+        self.court_keyword_var = tk.StringVar()
+        ttk.Entry(filters, textvariable=self.court_keyword_var, width=20).pack(side=tk.LEFT, padx=(6, 12))
+        ttk.Button(filters, text="搜索", command=self.refresh_courts).pack(side=tk.LEFT)
+        ttk.Button(filters, text="重置", command=self.reset_court_filter).pack(side=tk.LEFT, padx=(8, 0))
         self.court_tree = ttk.Treeview(frame, columns=("no", "name", "location", "status"), show="headings")
-        for key, text in (("no", "编号"), ("name", "名称"), ("location", "位置"), ("status", "状态")):
-            self.court_tree.heading(key, text=text)
+        configure_tree_columns(
+            self.court_tree,
+            (("no", "编号"), ("name", "名称"), ("location", "位置"), ("status", "状态")),
+        )
         self.court_tree.pack(fill=tk.BOTH, expand=True)
-        ttk.Button(frame, text="刷新", command=self.refresh_courts).pack(anchor=tk.E, pady=(8, 0))
         return frame
 
     def _build_booking_tab(self, parent) -> ttk.Frame:
@@ -66,20 +81,41 @@ class UserWindow(tk.Toplevel):
         ttk.Button(controls, text="预约选中时间段", command=self.book_selected_slot).pack(side=tk.RIGHT)
 
         self.slot_tree = ttk.Treeview(frame, columns=("date", "start", "end", "status"), show="headings")
-        for key, text in (("date", "日期"), ("start", "开始"), ("end", "结束"), ("status", "状态")):
-            self.slot_tree.heading(key, text=text)
+        configure_tree_columns(
+            self.slot_tree,
+            (("date", "日期"), ("start", "开始"), ("end", "结束"), ("status", "状态")),
+        )
         self.slot_tree.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
         return frame
 
     def _build_reservation_tab(self, parent) -> ttk.Frame:
         frame = ttk.Frame(parent, padding=8)
+        filters = ttk.Frame(frame)
+        filters.pack(fill=tk.X, pady=(0, 8))
+        ttk.Label(filters, text="状态").pack(side=tk.LEFT)
+        self.user_reservation_status_filter = tk.StringVar(value="全部")
+        ttk.Combobox(
+            filters,
+            textvariable=self.user_reservation_status_filter,
+            values=RESERVATION_STATUS_FILTER_LABELS,
+            state="readonly",
+            width=12,
+        ).pack(side=tk.LEFT, padx=(6, 12))
+        self.user_reservation_date_enabled = tk.BooleanVar(value=False)
+        ttk.Checkbutton(filters, text="日期", variable=self.user_reservation_date_enabled).pack(side=tk.LEFT)
+        self.user_reservation_date_filter = DateEntry(filters, date_pattern="yyyy-mm-dd", width=12)
+        self.user_reservation_date_filter.pack(side=tk.LEFT, padx=(6, 12))
+        ttk.Button(filters, text="筛选", command=self.refresh_reservations).pack(side=tk.LEFT)
+        ttk.Button(filters, text="重置", command=self.reset_reservation_filters).pack(side=tk.LEFT, padx=(8, 0))
         self.reservation_tree = ttk.Treeview(
             frame,
             columns=("no", "court", "date", "time", "status"),
             show="headings",
         )
-        for key, text in (("no", "预约编号"), ("court", "场地"), ("date", "日期"), ("time", "时间"), ("status", "状态")):
-            self.reservation_tree.heading(key, text=text)
+        configure_tree_columns(
+            self.reservation_tree,
+            (("no", "预约编号"), ("court", "场地"), ("date", "日期"), ("time", "时间"), ("status", "状态")),
+        )
         self.reservation_tree.pack(fill=tk.BOTH, expand=True)
         actions = ttk.Frame(frame)
         actions.pack(fill=tk.X, pady=(8, 0))
@@ -97,7 +133,7 @@ class UserWindow(tk.Toplevel):
         self.announcement_var.set(f"公告：{announcement}" if announcement else "")
 
     def refresh_courts(self) -> None:
-        self.courts = CourtService(self.session).list_open_courts()
+        self.courts = CourtService(self.session).list_open_courts(self.court_keyword_var.get())
         self.court_tree.delete(*self.court_tree.get_children())
         self.court_combo["values"] = [f"{court.court_no} - {court.name}" for court in self.courts]
         for court in self.courts:
@@ -107,6 +143,10 @@ class UserWindow(tk.Toplevel):
                 iid=str(court.id),
                 values=(court.court_no, court.name, court.location, court_status_label(court.status)),
             )
+
+    def reset_court_filter(self) -> None:
+        self.court_keyword_var.set("")
+        self.refresh_courts()
 
     def refresh_slots(self) -> None:
         selected = self.court_combo.current()
@@ -139,7 +179,14 @@ class UserWindow(tk.Toplevel):
         self.refresh_reservations()
 
     def refresh_reservations(self) -> None:
-        reservations = ReservationService(self.session).list_user_reservations(self.current_user.id)
+        status = reservation_status_value(self.user_reservation_status_filter.get())
+        reservations = ReservationService(self.session).list_user_reservations(
+            self.current_user.id,
+            status=status,
+            slot_date=self.user_reservation_date_filter.get_date()
+            if self.user_reservation_date_enabled.get()
+            else None,
+        )
         self.reservation_tree.delete(*self.reservation_tree.get_children())
         for item in reservations:
             time_text = f"{item.slot.start_time}-{item.slot.end_time}" if item.slot else ""
@@ -155,6 +202,11 @@ class UserWindow(tk.Toplevel):
                     reservation_status_label(item.status),
                 ),
             )
+
+    def reset_reservation_filters(self) -> None:
+        self.user_reservation_status_filter.set("全部")
+        self.user_reservation_date_enabled.set(False)
+        self.refresh_reservations()
 
     def cancel_selected_reservation(self) -> None:
         item = self._selected_iid(self.reservation_tree)

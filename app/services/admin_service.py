@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.models import Court, TimeSlot, User
+from app.models import Court, Reservation, TimeSlot, User
 
 
 class AdminPermissionError(Exception):
@@ -86,6 +86,53 @@ class AdminService:
         self._commit()
         self.session.refresh(court)
         return court
+
+    def update_court(
+        self,
+        court_id: int,
+        court_no: str,
+        name: str,
+        location: str,
+        status: str,
+        remark: str = "",
+    ) -> Court:
+        self.require_admin()
+        court_no = court_no.strip()
+        name = name.strip()
+        location = location.strip()
+        if not court_no:
+            raise ValueError("场地编号不能为空")
+        if not name:
+            raise ValueError("场地名称不能为空")
+        if status not in self.VALID_COURT_STATUSES:
+            raise ValueError("场地状态不合法")
+        court = self.session.get(Court, court_id)
+        if court is None:
+            raise ValueError("场地不存在")
+        court.court_no = court_no
+        court.name = name
+        court.location = location
+        court.status = status
+        court.remark = remark.strip()
+        try:
+            self.session.commit()
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise ValueError("场地编号已存在") from exc
+        self.session.refresh(court)
+        return court
+
+    def delete_court(self, court_id: int) -> None:
+        self.require_admin()
+        court = self.session.get(Court, court_id)
+        if court is None:
+            raise ValueError("场地不存在")
+        has_slots = self.session.query(TimeSlot).filter_by(court_id=court_id).first() is not None
+        has_reservations = self.session.query(Reservation).filter_by(court_id=court_id).first() is not None
+        if has_slots or has_reservations:
+            raise ValueError("场地已有时间段或预约记录，不能删除")
+        self.session.delete(court)
+        self._commit()
 
     def generate_slots(
         self,

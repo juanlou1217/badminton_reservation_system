@@ -106,7 +106,6 @@ make run
 - 运行与打包说明
 - 数据库设计说明
 - Harness 工程说明
-- 截图清单
 - 老师提供的 Word 模板备份
 
 ## 测试
@@ -115,9 +114,9 @@ make run
 pytest -q
 ```
 
-测试使用 SQLAlchemy 内存数据库验证服务层行为；正式运行只连接 `.env` 配置的远程 MySQL。远程数据库连通性可通过 `python scripts/check_db_connection.py` 检查。
+本地单元测试使用 SQLAlchemy 内存数据库验证服务层行为；正式运行连接 `.env` 配置的远程 MySQL。远程数据库连通性可通过 `python scripts/check_db_connection.py` 检查。
 
-可选远程 MySQL 集成测试会检查远程库连通性、项目表、`reservations.active_slot_id` 生成列和有效预约唯一索引：
+可选远程 MySQL 集成测试会检查远程库连通性、项目表、utf8mb4 字符集、`reservations.active_slot_id` 生成列、有效预约唯一索引和连接复用：
 
 ```bash
 RUN_MYSQL_TESTS=1 pytest tests/test_mysql_connection_optional.py -q

@@ -43,6 +43,42 @@ def test_admin_service_validates_court_input(db_session, seeded_db):
         service.create_court("C02", "二号场", "体育馆二层", "broken", "")
 
 
+def test_admin_can_update_court_details(db_session, seeded_db):
+    service = AdminService(db_session, seeded_db["admin"])
+    court = service.create_court("C02", "二号场", "体育馆二层", "open", "")
+
+    updated = service.update_court(
+        court.id,
+        court_no="C02A",
+        name="二号训练场",
+        location="体育馆三层",
+        status="closed",
+        remark="维护中",
+    )
+
+    assert updated.court_no == "C02A"
+    assert updated.name == "二号训练场"
+    assert updated.location == "体育馆三层"
+    assert updated.status == "closed"
+    assert updated.remark == "维护中"
+
+
+def test_admin_can_delete_unused_court(db_session, seeded_db):
+    service = AdminService(db_session, seeded_db["admin"])
+    court = service.create_court("C02", "二号场", "体育馆二层", "open", "")
+
+    service.delete_court(court.id)
+
+    assert db_session.get(type(court), court.id) is None
+
+
+def test_admin_cannot_delete_court_with_slots(db_session, seeded_db):
+    service = AdminService(db_session, seeded_db["admin"])
+
+    with pytest.raises(ValueError, match="场地已有时间段"):
+        service.delete_court(seeded_db["court"].id)
+
+
 def test_admin_can_list_and_disable_available_slot(db_session, seeded_db):
     service = AdminService(db_session, seeded_db["admin"])
 
