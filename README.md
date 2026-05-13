@@ -69,6 +69,17 @@ cp .env.example .env
 mysql -h juanlou.top -P 3306 -u juanlou -p juanlou < sql/init.sql
 ```
 
+演示账号：
+
+```text
+管理员：admin / admin123
+普通用户：user01 / user123
+普通用户：user02 / user123
+普通用户：user03 / user123
+```
+
+以上账号仅用于课程演示，正式部署后请修改密码。
+
 4. 检查数据库连接和关键约束。
 
 ```bash
@@ -92,7 +103,7 @@ make run
 ## 角色说明
 
 - 普通用户注册时默认 `role=user`。
-- `sql/init.sql` 已包含课程演示账号，执行后可直接使用演示管理员登录；正式环境应重置密码。
+- `sql/init.sql` 已包含课程演示账号，执行后可直接使用演示账号登录。
 - 登录成功后根据 `users.role` 打开不同 Tkinter 主窗口。
 - 管理员可维护公告和每日预约次数限制，普通用户预约时会校验该限制。
 - 用户到场后，管理员可在预约管理中核销预约，内部状态从 `booked` 变为 `finished`。
