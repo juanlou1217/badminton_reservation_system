@@ -65,32 +65,19 @@ cp .env.example .env
 
 把 `.env` 中的 `DB_PASSWORD` 改为真实密码。
 
-3. 初始化数据库表。
-
-```bash
-python scripts/check_db_connection.py
-python -c "from app.db import init_db; init_db()"
-```
-
-也可以用一个 SQL 文件完成表结构和演示数据初始化：
+3. 初始化数据库。`sql/init.sql` 会一次性创建表结构、演示账号、默认设置、场地和当天时间段。
 
 ```bash
 mysql -h juanlou.top -P 3306 -u juanlou -p juanlou < sql/init.sql
 ```
 
-4. 创建管理员账号。
+4. 检查数据库连接和关键约束。
 
 ```bash
-python scripts/init_admin.py
+python scripts/check_db_connection.py
 ```
 
-5. 写入演示数据。
-
-```bash
-python scripts/seed_demo_data.py
-```
-
-6. 启动程序。
+5. 启动程序。
 
 ```bash
 python main.py
@@ -107,7 +94,7 @@ make run
 ## 角色说明
 
 - 普通用户注册时默认 `role=user`。
-- 管理员账号可通过 `scripts/init_admin.py` 创建；`sql/init.sql` 也包含课程演示测试账号，正式环境应重置密码。
+- `sql/init.sql` 已包含课程演示账号，执行后可直接使用演示管理员登录；正式环境应重置密码。
 - 登录成功后根据 `users.role` 打开不同 Tkinter 主窗口。
 - 管理员可维护公告和每日预约次数限制，普通用户预约时会校验该限制。
 - 用户到场后，管理员可在预约管理中核销预约，内部状态从 `booked` 变为 `finished`。
