@@ -50,7 +50,7 @@ make run
 - `reservations.active_slot_id` 生成列是否存在。
 - `uq_reservations_active_slot` 唯一索引是否存在。
 
-脚本输出会隐藏 `DB_PASSWORD`，避免把真实密码打印到终端或截图中。
+脚本输出会隐藏 `DB_PASSWORD`，避免真实密码出现在终端输出或日志中。
 
 ## CI
 
