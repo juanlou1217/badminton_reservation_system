@@ -33,7 +33,7 @@ def test_create_reservation_respects_daily_limit(db_session, seeded_db):
     from app.models import TimeSlot
     from app.services.settings_service import SettingsService
 
-    SettingsService(db_session).set_value("max_daily_reservations", "1", "每日最大预约次数")
+    SettingsService(db_session, seeded_db["admin"]).set_value("max_daily_reservations", "1", "每日最大预约次数")
     second_slot = TimeSlot(
         court_id=seeded_db["court"].id,
         slot_date=date(2026, 5, 20),
@@ -102,3 +102,10 @@ def test_admin_can_cancel_any_booking(db_session, seeded_db):
     )
 
     assert cancelled.status == "cancelled"
+
+
+def test_list_all_reservations_requires_admin(db_session, seeded_db):
+    service = ReservationService(db_session)
+
+    with pytest.raises(ReservationError, match="需要管理员权限"):
+        service.list_all_reservations(current_user=seeded_db["user"])

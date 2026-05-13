@@ -95,17 +95,31 @@ class ReservationService:
             .all()
         )
 
-    def list_all_reservations(self) -> list[Reservation]:
-        return (
+    def list_all_reservations(
+        self,
+        current_user: User,
+        username: str = "",
+        status: str = "",
+        slot_date=None,
+    ) -> list[Reservation]:
+        if current_user.role != "admin":
+            raise ReservationError("需要管理员权限")
+        query = (
             self.session.query(Reservation)
             .options(
                 joinedload(Reservation.user),
                 joinedload(Reservation.court),
                 joinedload(Reservation.slot),
             )
-            .order_by(Reservation.created_at.desc())
-            .all()
         )
+        username = username.strip()
+        if username:
+            query = query.join(User, Reservation.user_id == User.id).filter(User.username.contains(username))
+        if status:
+            query = query.filter(Reservation.status == status)
+        if slot_date is not None:
+            query = query.join(TimeSlot, Reservation.slot_id == TimeSlot.id).filter(TimeSlot.slot_date == slot_date)
+        return query.order_by(Reservation.created_at.desc()).all()
 
     def _new_reservation_no(self) -> str:
         return "R" + datetime.now().strftime("%Y%m%d%H%M%S") + uuid4().hex[:6].upper()

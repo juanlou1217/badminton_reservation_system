@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -50,6 +51,10 @@ class AuthService:
             status="normal",
         )
         self.session.add(user)
-        self.session.commit()
+        try:
+            self.session.commit()
+        except SQLAlchemyError as exc:
+            self.session.rollback()
+            raise AuthenticationError("注册失败，请稍后重试") from exc
         self.session.refresh(user)
         return user

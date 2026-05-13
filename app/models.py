@@ -4,6 +4,8 @@ from datetime import date, datetime, time
 from typing import Optional
 
 from sqlalchemy import (
+    CheckConstraint,
+    Computed,
     Date,
     DateTime,
     ForeignKey,
@@ -23,6 +25,10 @@ class Base(DeclarativeBase):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint("role IN ('user', 'admin')", name="chk_users_role"),
+        CheckConstraint("status IN ('normal', 'disabled')", name="chk_users_status"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
@@ -37,6 +43,9 @@ class User(Base):
 
 class Court(Base):
     __tablename__ = "courts"
+    __table_args__ = (
+        CheckConstraint("status IN ('open', 'closed')", name="chk_courts_status"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     court_no: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
@@ -59,6 +68,8 @@ class TimeSlot(Base):
             "end_time",
             name="uq_time_slots_court_date_time",
         ),
+        CheckConstraint("status IN ('available', 'booked', 'disabled')", name="chk_time_slots_status"),
+        CheckConstraint("start_time < end_time", name="chk_time_slots_time_range"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -74,6 +85,10 @@ class TimeSlot(Base):
 
 class Reservation(Base):
     __tablename__ = "reservations"
+    __table_args__ = (
+        UniqueConstraint("active_slot_id", name="uq_reservations_active_slot"),
+        CheckConstraint("status IN ('booked', 'cancelled', 'finished')", name="chk_reservations_status"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     reservation_no: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
@@ -81,6 +96,11 @@ class Reservation(Base):
     court_id: Mapped[int] = mapped_column(ForeignKey("courts.id"), nullable=False, index=True)
     slot_id: Mapped[int] = mapped_column(ForeignKey("time_slots.id"), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="booked")
+    active_slot_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        Computed("CASE WHEN status = 'booked' THEN slot_id ELSE NULL END", persisted=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 

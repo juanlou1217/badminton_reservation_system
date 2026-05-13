@@ -15,6 +15,7 @@ class AdminPermissionError(Exception):
 class AdminService:
     VALID_USER_STATUSES = {"normal", "disabled"}
     VALID_COURT_STATUSES = {"open", "closed"}
+    VALID_SLOT_STATUSES = {"available", "booked", "disabled"}
 
     def __init__(self, session: Session, current_user: User):
         self.session = session
@@ -130,6 +131,31 @@ class AdminService:
         for slot in generated:
             self.session.refresh(slot)
         return generated
+
+    def list_slots(self, court_id: int | None = None, slot_date: date | None = None) -> list[TimeSlot]:
+        self.require_admin()
+        query = self.session.query(TimeSlot).join(Court, TimeSlot.court_id == Court.id)
+        if court_id is not None:
+            query = query.filter(TimeSlot.court_id == court_id)
+        if slot_date is not None:
+            query = query.filter(TimeSlot.slot_date == slot_date)
+        return query.order_by(TimeSlot.slot_date.desc(), Court.court_no, TimeSlot.start_time).all()
+
+    def set_slot_status(self, slot_id: int, status: str) -> TimeSlot:
+        self.require_admin()
+        if status not in self.VALID_SLOT_STATUSES:
+            raise ValueError("时间段状态不合法")
+        slot = self.session.get(TimeSlot, slot_id)
+        if slot is None:
+            raise ValueError("时间段不存在")
+        if slot.status == "booked" and status != "booked":
+            raise ValueError("已预约时间段不能直接修改状态，请先取消预约")
+        if status == "booked" and slot.status != "booked":
+            raise ValueError("不能手动设置为已预约")
+        slot.status = status
+        self._commit()
+        self.session.refresh(slot)
+        return slot
 
     def _commit(self) -> None:
         try:

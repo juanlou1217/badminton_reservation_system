@@ -48,8 +48,9 @@ def main() -> None:
                             status="available",
                         )
                     )
-        SettingsService(session).set_value("max_daily_reservations", "2", "单个用户每天最多预约次数")
-        SettingsService(session).set_value("announcement", "欢迎使用体育馆羽毛球预约系统。", "系统公告")
+        settings = SettingsService(session, allow_system_write=True)
+        settings.set_value("max_daily_reservations", "2", "单个用户每天最多预约次数")
+        settings.set_value("announcement", "欢迎使用体育馆羽毛球预约系统。", "系统公告")
         session.commit()
     finally:
         session.close()

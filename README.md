@@ -95,7 +95,7 @@ python main.py
 ## 角色说明
 
 - 普通用户注册时默认 `role=user`。
-- 管理员账号通过 `scripts/init_admin.py` 或数据库初始化创建，`role=admin`。
+- 管理员账号通过 `scripts/init_admin.py` 创建，`role=admin`；公开 SQL 初始化脚本不固定管理员密码。
 - 登录成功后根据 `users.role` 打开不同 Tkinter 主窗口。
 - 管理员可维护公告和每日预约次数限制，普通用户预约时会校验该限制。
 
@@ -118,7 +118,7 @@ pytest -q
 
 测试使用 SQLAlchemy 内存数据库验证服务层行为；正式运行只连接 `.env` 配置的远程 MySQL。远程数据库连通性可通过 `python scripts/check_db_connection.py` 检查。
 
-可选远程 MySQL 集成测试：
+可选远程 MySQL 集成测试会检查远程库连通性、项目表、`reservations.active_slot_id` 生成列和有效预约唯一索引：
 
 ```bash
 RUN_MYSQL_TESTS=1 pytest tests/test_mysql_connection_optional.py -q
@@ -127,6 +127,7 @@ RUN_MYSQL_TESTS=1 pytest tests/test_mysql_connection_optional.py -q
 ## 关键实现说明
 
 - 预约创建使用数据库条件更新抢占时间段：只有 `time_slots.status='available'` 时才会更新为 `booked`，避免两个客户端同时预约同一时间段。
-- 管理员服务在方法内部校验当前用户角色，不能只依赖 UI 入口。
+- `reservations.active_slot_id` 生成列配合 `uq_reservations_active_slot` 唯一索引，从数据库层限制同一时间段只能存在一条有效预约。
+- 管理员服务、统计、导出、系统设置写入、全部预约查询都在服务层校验当前用户角色，不能只依赖 UI 入口。
 - 取消预约接收当前用户对象，服务层根据 `role` 判断是否允许管理员取消他人预约。
 - 服务层在数据库提交失败时执行 rollback，避免 session 留在不可继续使用状态。
