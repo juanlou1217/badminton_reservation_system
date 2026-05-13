@@ -3,9 +3,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from sqlalchemy.exc import SQLAlchemyError
-
-from app.db import SessionLocal, init_db
+from app.db import SessionLocal
 from app.services.auth_service import AuthService, AuthenticationError
 from app.ui.admin_window import AdminWindow
 from app.ui.user_window import UserWindow
@@ -78,12 +76,11 @@ class LoginWindow(tk.Tk):
 
 def run_app() -> None:
     try:
-        init_db()
         app = LoginWindow()
-    except (RuntimeError, SQLAlchemyError) as exc:
+    except RuntimeError as exc:
         root = tk.Tk()
         root.withdraw()
-        messagebox.showerror("启动失败", f"数据库初始化失败：{exc}")
+        messagebox.showerror("启动失败", f"数据库配置失败：{exc}")
         root.destroy()
         return
     app.mainloop()

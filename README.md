@@ -27,10 +27,8 @@ badminton_reservation_system/
 │   └── ui/
 ├── scripts/
 │   ├── doctor.py
-│   ├── init_admin.py
-│   └── seed_demo_data.py
+│   └── check_db_connection.py
 ├── sql/
-│   ├── schema.sql
 │   └── init.sql
 ├── doc/
 │   ├── 课程设计报告草稿.md

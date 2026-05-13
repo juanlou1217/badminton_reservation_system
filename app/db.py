@@ -6,7 +6,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import DatabaseConfig
-from app.models import Base
 
 
 _engine = None
@@ -34,10 +33,6 @@ def get_session_factory():
 
 def SessionLocal() -> Session:
     return get_session_factory()()
-
-
-def init_db() -> None:
-    Base.metadata.create_all(bind=get_engine())
 
 
 def get_session() -> Iterator[Session]:
