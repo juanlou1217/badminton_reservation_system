@@ -38,7 +38,7 @@ class ReservationService:
             .join(TimeSlot, Reservation.slot_id == TimeSlot.id)
             .filter(
                 Reservation.user_id == user_id,
-                Reservation.status == "booked",
+                Reservation.status.in_(("booked", "finished")),
                 TimeSlot.slot_date == slot.slot_date,
             )
             .count()
@@ -82,6 +82,23 @@ class ReservationService:
         slot = self.session.get(TimeSlot, reservation.slot_id)
         if slot is not None:
             slot.status = "available"
+        self._commit()
+        self.session.refresh(reservation)
+        return reservation
+
+    def verify_reservation(
+        self,
+        reservation_id: int,
+        current_user: User,
+    ) -> Reservation:
+        if current_user.role != "admin":
+            raise ReservationError("需要管理员权限")
+        reservation = self.session.get(Reservation, reservation_id)
+        if reservation is None:
+            raise ReservationError("预约不存在")
+        if reservation.status != "booked":
+            raise ReservationError("只有已预约状态可以核销")
+        reservation.status = "finished"
         self._commit()
         self.session.refresh(reservation)
         return reservation

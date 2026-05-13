@@ -5,6 +5,7 @@ from pathlib import Path
 import openpyxl
 from sqlalchemy.orm import Session
 
+from app.display_labels import reservation_status_label
 from app.models import User
 from app.services.reservation_service import ReservationService
 
@@ -36,7 +37,7 @@ class ExportService:
                     item.slot.slot_date.isoformat() if item.slot else "",
                     str(item.slot.start_time) if item.slot else "",
                     str(item.slot.end_time) if item.slot else "",
-                    item.status,
+                    reservation_status_label(item.status),
                 ]
             )
         workbook.save(output)

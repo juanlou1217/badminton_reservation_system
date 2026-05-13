@@ -107,9 +107,10 @@ make run
 ## 角色说明
 
 - 普通用户注册时默认 `role=user`。
-- 管理员账号通过 `scripts/init_admin.py` 创建，`role=admin`；公开 SQL 初始化脚本不固定管理员密码。
+- 管理员账号可通过 `scripts/init_admin.py` 创建；`sql/init.sql` 也包含课程演示测试账号，正式环境应重置密码。
 - 登录成功后根据 `users.role` 打开不同 Tkinter 主窗口。
 - 管理员可维护公告和每日预约次数限制，普通用户预约时会校验该限制。
+- 用户到场后，管理员可在预约管理中核销预约，内部状态从 `booked` 变为 `finished`。
 
 ## 文档材料
 
@@ -150,4 +151,5 @@ python scripts/doctor.py --mysql
 - `reservations.active_slot_id` 生成列配合 `uq_reservations_active_slot` 唯一索引，从数据库层限制同一时间段只能存在一条有效预约。
 - 管理员服务、统计、导出、系统设置写入、全部预约查询都在服务层校验当前用户角色，不能只依赖 UI 入口。
 - 取消预约接收当前用户对象，服务层根据 `role` 判断是否允许管理员取消他人预约。
+- 核销预约只允许管理员执行；已核销预约不能再次取消，且会计入每日预约次数限制。
 - 服务层在数据库提交失败时执行 rollback，避免 session 留在不可继续使用状态。

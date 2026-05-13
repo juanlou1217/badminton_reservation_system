@@ -45,14 +45,16 @@ def test_stats_service_summarizes_reservations(db_session, seeded_db):
     db_session.add(second_slot)
     db_session.commit()
     reservation_service = ReservationService(db_session)
-    reservation_service.create_reservation(seeded_db["user"].id, seeded_db["slot"].id)
+    reservation = reservation_service.create_reservation(seeded_db["user"].id, seeded_db["slot"].id)
     reservation_service.create_reservation(seeded_db["user"].id, second_slot.id)
+    reservation_service.verify_reservation(reservation.id, seeded_db["admin"])
 
     summary = StatsService(db_session, seeded_db["admin"]).reservation_summary()
 
     assert summary["total"] == 2
-    assert summary["booked"] == 2
+    assert summary["booked"] == 1
     assert summary["cancelled"] == 0
+    assert summary["finished"] == 1
     assert summary["by_court"][0]["court"] == "一号场"
     assert summary["by_court"][0]["count"] == 2
 

@@ -21,6 +21,7 @@ class StatsService:
         total = self.session.query(func.count(Reservation.id)).scalar() or 0
         booked = self.session.query(func.count(Reservation.id)).filter_by(status="booked").scalar() or 0
         cancelled = self.session.query(func.count(Reservation.id)).filter_by(status="cancelled").scalar() or 0
+        finished = self.session.query(func.count(Reservation.id)).filter_by(status="finished").scalar() or 0
         by_court_rows = (
             self.session.query(Court.name, func.count(Reservation.id))
             .join(Reservation, Reservation.court_id == Court.id)
@@ -39,6 +40,7 @@ class StatsService:
             "total": total,
             "booked": booked,
             "cancelled": cancelled,
+            "finished": finished,
             "by_court": [{"court": name, "count": count} for name, count in by_court_rows],
             "by_date": [{"date": slot_date, "count": count} for slot_date, count in by_date_rows],
         }

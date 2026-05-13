@@ -7,6 +7,7 @@ from tkinter import messagebox, ttk
 from sqlalchemy.orm import Session
 from tkcalendar import DateEntry
 
+from app.display_labels import court_status_label, reservation_status_label, slot_status_label
 from app.models import Court, TimeSlot, User
 from app.services.court_service import CourtService
 from app.services.reservation_service import ReservationError, ReservationService
@@ -100,7 +101,12 @@ class UserWindow(tk.Toplevel):
         self.court_tree.delete(*self.court_tree.get_children())
         self.court_combo["values"] = [f"{court.court_no} - {court.name}" for court in self.courts]
         for court in self.courts:
-            self.court_tree.insert("", tk.END, iid=str(court.id), values=(court.court_no, court.name, court.location, court.status))
+            self.court_tree.insert(
+                "",
+                tk.END,
+                iid=str(court.id),
+                values=(court.court_no, court.name, court.location, court_status_label(court.status)),
+            )
 
     def refresh_slots(self) -> None:
         selected = self.court_combo.current()
@@ -112,7 +118,12 @@ class UserWindow(tk.Toplevel):
         self.slots = SlotService(self.session).list_available_slots(court.id, selected_date)
         self.slot_tree.delete(*self.slot_tree.get_children())
         for slot in self.slots:
-            self.slot_tree.insert("", tk.END, iid=str(slot.id), values=(slot.slot_date, slot.start_time, slot.end_time, slot.status))
+            self.slot_tree.insert(
+                "",
+                tk.END,
+                iid=str(slot.id),
+                values=(slot.slot_date, slot.start_time, slot.end_time, slot_status_label(slot.status)),
+            )
 
     def book_selected_slot(self) -> None:
         item = self._selected_iid(self.slot_tree)
@@ -136,7 +147,13 @@ class UserWindow(tk.Toplevel):
                 "",
                 tk.END,
                 iid=str(item.id),
-                values=(item.reservation_no, item.court.name if item.court else "", item.slot.slot_date if item.slot else "", time_text, item.status),
+                values=(
+                    item.reservation_no,
+                    item.court.name if item.court else "",
+                    item.slot.slot_date if item.slot else "",
+                    time_text,
+                    reservation_status_label(item.status),
+                ),
             )
 
     def cancel_selected_reservation(self) -> None:

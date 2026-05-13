@@ -1,6 +1,6 @@
 -- 体育馆羽毛球预约系统初始化脚本
--- 一次性完成：建表、默认系统设置、演示场地、当天演示时间段。
--- 管理员账号建议使用 `python scripts/init_admin.py` 创建，避免在公开 SQL 中固定密码。
+-- 一次性完成：建表、测试账号、默认系统设置、演示场地、当天演示时间段。
+-- 下面账号仅用于课程设计演示测试，请不要直接用于生产环境。
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 1;
@@ -73,6 +73,18 @@ CREATE TABLE IF NOT EXISTS settings (
     setting_value VARCHAR(255) NOT NULL,
     remark TEXT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO users (username, phone, password_hash, role, status)
+VALUES
+    ('admin', '13800000000', 'pbkdf2:sha256:1000000$qME5grjeZWXRtCHY$5cb4381246dbd5ed04c2668c19be803c3482177153ec2464d124687dbc343702', 'admin', 'normal'),
+    ('user01', '13900000001', 'pbkdf2:sha256:1000000$5DQP92aMh6mA2TE0$5a1e945801d63b5054230fd509b51d28155796e62f927c4aaa4684fdb32db44d', 'user', 'normal'),
+    ('user02', '13900000002', 'pbkdf2:sha256:1000000$TGJNlMW0RVeLfcfS$f87662d9195e82fa589ff4b6d6fb7d8ab94224a6e3a1196a8e643224dfc4280a', 'user', 'normal'),
+    ('user03', '13900000003', 'pbkdf2:sha256:1000000$Z0oT9AFJja6itBmz$484113c9212dc668b642f3addd7434525658ed8be6a0834d98c547650fa3bf23', 'user', 'normal')
+ON DUPLICATE KEY UPDATE
+    phone = VALUES(phone),
+    password_hash = VALUES(password_hash),
+    role = VALUES(role),
+    status = VALUES(status);
 
 INSERT INTO settings (setting_key, setting_value, remark)
 VALUES

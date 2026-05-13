@@ -36,6 +36,8 @@ class AuthService:
         phone = phone.strip()
         if not username or not password:
             raise AuthenticationError("用户名和密码不能为空")
+        if not phone:
+            raise AuthenticationError("手机号不能为空")
         if phone and re.fullmatch(r"1\d{10}", phone) is None:
             raise AuthenticationError("手机号格式不正确")
         if len(password) < 6:

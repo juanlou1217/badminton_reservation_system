@@ -7,6 +7,15 @@ from tkinter import filedialog, messagebox, ttk
 from sqlalchemy.orm import Session
 from tkcalendar import DateEntry
 
+from app.display_labels import (
+    RESERVATION_STATUS_FILTER_LABELS,
+    court_status_label,
+    reservation_status_label,
+    reservation_status_value,
+    role_label,
+    slot_status_label,
+    user_status_label,
+)
 from app.models import Court, User
 from app.services.admin_service import AdminService
 from app.services.court_service import CourtService
@@ -14,6 +23,19 @@ from app.services.export_service import ExportService
 from app.services.reservation_service import ReservationError, ReservationService
 from app.services.settings_service import SettingsService
 from app.services.stats_service import StatsService
+
+
+def format_stats_summary(summary: dict) -> str:
+    court_lines = ", ".join(f"{item['court']} {item['count']} 次" for item in summary["by_court"]) or "暂无"
+    date_lines = ", ".join(f"{item['date']} {item['count']} 次" for item in summary["by_date"]) or "暂无"
+    return (
+        f"预约总数：{summary['total']}\n"
+        f"有效预约：{summary['booked']}\n"
+        f"已取消：{summary['cancelled']}\n"
+        f"已核销：{summary['finished']}\n"
+        f"场地使用统计：{court_lines}\n"
+        f"每日预约统计：{date_lines}"
+    )
 
 
 class AdminWindow(tk.Toplevel):
@@ -134,7 +156,7 @@ class AdminWindow(tk.Toplevel):
         ttk.Combobox(
             filters,
             textvariable=self.reservation_status_filter,
-            values=("全部", "booked", "cancelled", "finished"),
+            values=RESERVATION_STATUS_FILTER_LABELS,
             state="readonly",
             width=12,
         ).pack(side=tk.LEFT, padx=(6, 12))
@@ -161,6 +183,7 @@ class AdminWindow(tk.Toplevel):
         self.admin_reservation_tree.pack(fill=tk.BOTH, expand=True)
         actions = ttk.Frame(frame)
         actions.pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(actions, text="核销选中预约", command=self.verify_selected_reservation).pack(side=tk.RIGHT)
         ttk.Button(actions, text="取消选中预约", command=self.cancel_selected_reservation).pack(side=tk.RIGHT)
         ttk.Button(actions, text="刷新", command=self.refresh_reservations).pack(side=tk.RIGHT, padx=(0, 8))
         return frame
@@ -200,7 +223,7 @@ class AdminWindow(tk.Toplevel):
                 "",
                 tk.END,
                 iid=str(user.id),
-                values=(user.username, user.phone, user.role, user.status),
+                values=(user.username, user.phone, role_label(user.role), user_status_label(user.status)),
             )
 
     def refresh_courts(self) -> None:
@@ -212,13 +235,11 @@ class AdminWindow(tk.Toplevel):
                 "",
                 tk.END,
                 iid=str(court.id),
-                values=(court.court_no, court.name, court.location, court.status),
+                values=(court.court_no, court.name, court.location, court_status_label(court.status)),
             )
 
     def refresh_reservations(self) -> None:
-        status = self.reservation_status_filter.get()
-        if status == "全部":
-            status = ""
+        status = reservation_status_value(self.reservation_status_filter.get())
         reservations = ReservationService(self.session).list_all_reservations(
             current_user=self.current_user,
             username=self.reservation_user_filter.get(),
@@ -238,7 +259,7 @@ class AdminWindow(tk.Toplevel):
                     item.court.name if item.court else "",
                     item.slot.slot_date if item.slot else "",
                     time_text,
-                    item.status,
+                    reservation_status_label(item.status),
                 ),
             )
 
@@ -251,7 +272,7 @@ class AdminWindow(tk.Toplevel):
                 "",
                 tk.END,
                 iid=str(slot.id),
-                values=(court_text, slot.slot_date, time_text, slot.status),
+                values=(court_text, slot.slot_date, time_text, slot_status_label(slot.status)),
             )
 
     def reset_reservation_filters(self) -> None:
@@ -328,6 +349,18 @@ class AdminWindow(tk.Toplevel):
             return
         self.refresh_reservations()
 
+    def verify_selected_reservation(self) -> None:
+        item = self._selected_iid(self.admin_reservation_tree)
+        if item is None:
+            return
+        try:
+            ReservationService(self.session).verify_reservation(int(item), self.current_user)
+        except ReservationError as exc:
+            messagebox.showerror("核销失败", str(exc))
+            return
+        self.refresh_reservations()
+        self.refresh_stats()
+
     def export_reservations(self) -> None:
         path = filedialog.asksaveasfilename(
             defaultextension=".xlsx",
@@ -361,15 +394,7 @@ class AdminWindow(tk.Toplevel):
 
     def refresh_stats(self) -> None:
         summary = StatsService(self.session, self.current_user).reservation_summary()
-        court_lines = ", ".join(f"{item['court']} {item['count']} 次" for item in summary["by_court"]) or "暂无"
-        date_lines = ", ".join(f"{item['date']} {item['count']} 次" for item in summary["by_date"]) or "暂无"
-        self.stats_text.set(
-            f"预约总数：{summary['total']}\\n"
-            f"有效预约：{summary['booked']}\\n"
-            f"已取消：{summary['cancelled']}\\n"
-            f"场地使用统计：{court_lines}\\n"
-            f"每日预约统计：{date_lines}"
-        )
+        self.stats_text.set(format_stats_summary(summary))
 
     def _selected_iid(self, tree: ttk.Treeview) -> str | None:
         selection = tree.selection()

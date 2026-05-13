@@ -50,6 +50,9 @@ def test_authenticate_rejects_disabled_user(db_session):
 def test_register_user_validates_phone_and_password(db_session):
     service = AuthService(db_session)
 
+    with pytest.raises(AuthenticationError, match="手机号不能为空"):
+        service.register_user("bob", "", "secret123")
+
     with pytest.raises(AuthenticationError, match="手机号格式不正确"):
         service.register_user("bob", "123", "secret123")
 
