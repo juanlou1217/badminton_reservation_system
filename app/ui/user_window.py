@@ -1,0 +1,154 @@
+from __future__ import annotations
+
+import tkinter as tk
+from datetime import date
+from tkinter import messagebox, ttk
+
+from sqlalchemy.orm import Session
+from tkcalendar import DateEntry
+
+from app.models import Court, TimeSlot, User
+from app.services.court_service import CourtService
+from app.services.reservation_service import ReservationError, ReservationService
+from app.services.slot_service import SlotService
+
+
+class UserWindow(tk.Toplevel):
+    def __init__(self, parent: tk.Tk, session: Session, current_user: User):
+        super().__init__(parent)
+        self.parent = parent
+        self.session = session
+        self.current_user = current_user
+        self.courts: list[Court] = []
+        self.slots: list[TimeSlot] = []
+        self.title(f"普通用户 - {current_user.username}")
+        self.geometry("900x560")
+        self.protocol("WM_DELETE_WINDOW", self.logout)
+        self._build()
+        self.refresh_all()
+
+    def _build(self) -> None:
+        top = ttk.Frame(self, padding=(12, 8))
+        top.pack(fill=tk.X)
+        ttk.Label(top, text=f"当前用户：{self.current_user.username}").pack(side=tk.LEFT)
+        ttk.Button(top, text="退出登录", command=self.logout).pack(side=tk.RIGHT)
+
+        notebook = ttk.Notebook(self)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
+        notebook.add(self._build_court_tab(notebook), text="场地查询")
+        notebook.add(self._build_booking_tab(notebook), text="我要预约")
+        notebook.add(self._build_reservation_tab(notebook), text="我的预约")
+
+    def _build_court_tab(self, parent) -> ttk.Frame:
+        frame = ttk.Frame(parent, padding=8)
+        self.court_tree = ttk.Treeview(frame, columns=("no", "name", "location", "status"), show="headings")
+        for key, text in (("no", "编号"), ("name", "名称"), ("location", "位置"), ("status", "状态")):
+            self.court_tree.heading(key, text=text)
+        self.court_tree.pack(fill=tk.BOTH, expand=True)
+        ttk.Button(frame, text="刷新", command=self.refresh_courts).pack(anchor=tk.E, pady=(8, 0))
+        return frame
+
+    def _build_booking_tab(self, parent) -> ttk.Frame:
+        frame = ttk.Frame(parent, padding=8)
+        controls = ttk.Frame(frame)
+        controls.pack(fill=tk.X)
+        ttk.Label(controls, text="日期").pack(side=tk.LEFT)
+        self.booking_date = DateEntry(controls, date_pattern="yyyy-mm-dd")
+        self.booking_date.pack(side=tk.LEFT, padx=(8, 16))
+        ttk.Label(controls, text="场地").pack(side=tk.LEFT)
+        self.court_combo = ttk.Combobox(controls, state="readonly", width=24)
+        self.court_combo.pack(side=tk.LEFT, padx=(8, 16))
+        ttk.Button(controls, text="查询时间段", command=self.refresh_slots).pack(side=tk.LEFT)
+        ttk.Button(controls, text="预约选中时间段", command=self.book_selected_slot).pack(side=tk.RIGHT)
+
+        self.slot_tree = ttk.Treeview(frame, columns=("date", "start", "end", "status"), show="headings")
+        for key, text in (("date", "日期"), ("start", "开始"), ("end", "结束"), ("status", "状态")):
+            self.slot_tree.heading(key, text=text)
+        self.slot_tree.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
+        return frame
+
+    def _build_reservation_tab(self, parent) -> ttk.Frame:
+        frame = ttk.Frame(parent, padding=8)
+        self.reservation_tree = ttk.Treeview(
+            frame,
+            columns=("no", "court", "date", "time", "status"),
+            show="headings",
+        )
+        for key, text in (("no", "预约编号"), ("court", "场地"), ("date", "日期"), ("time", "时间"), ("status", "状态")):
+            self.reservation_tree.heading(key, text=text)
+        self.reservation_tree.pack(fill=tk.BOTH, expand=True)
+        actions = ttk.Frame(frame)
+        actions.pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(actions, text="刷新", command=self.refresh_reservations).pack(side=tk.RIGHT)
+        ttk.Button(actions, text="取消选中预约", command=self.cancel_selected_reservation).pack(side=tk.RIGHT, padx=(0, 8))
+        return frame
+
+    def refresh_all(self) -> None:
+        self.refresh_courts()
+        self.refresh_reservations()
+
+    def refresh_courts(self) -> None:
+        self.courts = CourtService(self.session).list_open_courts()
+        self.court_tree.delete(*self.court_tree.get_children())
+        self.court_combo["values"] = [f"{court.court_no} - {court.name}" for court in self.courts]
+        for court in self.courts:
+            self.court_tree.insert("", tk.END, iid=str(court.id), values=(court.court_no, court.name, court.location, court.status))
+
+    def refresh_slots(self) -> None:
+        selected = self.court_combo.current()
+        if selected < 0:
+            messagebox.showwarning("提示", "请先选择场地")
+            return
+        court = self.courts[selected]
+        selected_date: date = self.booking_date.get_date()
+        self.slots = SlotService(self.session).list_available_slots(court.id, selected_date)
+        self.slot_tree.delete(*self.slot_tree.get_children())
+        for slot in self.slots:
+            self.slot_tree.insert("", tk.END, iid=str(slot.id), values=(slot.slot_date, slot.start_time, slot.end_time, slot.status))
+
+    def book_selected_slot(self) -> None:
+        item = self._selected_iid(self.slot_tree)
+        if item is None:
+            return
+        try:
+            ReservationService(self.session).create_reservation(self.current_user.id, int(item))
+        except ReservationError as exc:
+            messagebox.showerror("预约失败", str(exc))
+            return
+        messagebox.showinfo("预约成功", "预约已提交。")
+        self.refresh_slots()
+        self.refresh_reservations()
+
+    def refresh_reservations(self) -> None:
+        reservations = ReservationService(self.session).list_user_reservations(self.current_user.id)
+        self.reservation_tree.delete(*self.reservation_tree.get_children())
+        for item in reservations:
+            time_text = f"{item.slot.start_time}-{item.slot.end_time}" if item.slot else ""
+            self.reservation_tree.insert(
+                "",
+                tk.END,
+                iid=str(item.id),
+                values=(item.reservation_no, item.court.name if item.court else "", item.slot.slot_date if item.slot else "", time_text, item.status),
+            )
+
+    def cancel_selected_reservation(self) -> None:
+        item = self._selected_iid(self.reservation_tree)
+        if item is None:
+            return
+        try:
+            ReservationService(self.session).cancel_reservation(int(item), self.current_user.id, is_admin=False)
+        except ReservationError as exc:
+            messagebox.showerror("取消失败", str(exc))
+            return
+        self.refresh_reservations()
+
+    def _selected_iid(self, tree: ttk.Treeview) -> str | None:
+        selection = tree.selection()
+        if not selection:
+            messagebox.showwarning("提示", "请先选择一条记录")
+            return None
+        return selection[0]
+
+    def logout(self) -> None:
+        self.destroy()
+        self.parent.deiconify()

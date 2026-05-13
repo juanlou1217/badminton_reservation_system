@@ -1,0 +1,1 @@
+"""Badminton reservation system package."""
